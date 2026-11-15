@@ -8,5 +8,36 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - run: curl -L https://vinickgold.github.io/omni-diet/landing-page
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Load landing page with headless browser
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium
+          node -e "
+            const { chromium } = require('playwright');
+            (async () => {
+              const browser = await chromium.launch();
+              const page = await browser.newPage();
+              await page.goto('https://vinickgold.github.io/omni-diet/landing-page', { waitUntil: 'networkidle', timeout: 60000 });
+              await page.waitForTimeout(3000);
+              await browser.close();
+            })();
+          "
+      - name: Monthly maintenance
+        run: |
+          LAST_COMMIT=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DIFF=$((NOW - LAST_COMMIT))
+          if [ "$DIFF" -ge 2592000 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: monthly maintenance"
+            git push
+          fi
